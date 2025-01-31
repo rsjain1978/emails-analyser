@@ -50,8 +50,28 @@
         }
         
         th {
-            background-color: #f9fafb;
+            background-color: #1e40af;
+            color: white;
             font-weight: 600;
+            padding: 1rem;
+            transition: background-color 0.3s ease;
+        }
+        
+        th:hover {
+            background-color: #1e3a8a;
+        }
+        
+        .filter-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .filter-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
         
         .btn {
@@ -125,38 +145,61 @@
             white-space: pre-wrap;
             font-family: system-ui, -apple-system, sans-serif;
         }
+
+        .section-container {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .section-half {
+            flex: 1;
+            min-width: 0; /* This prevents flex items from overflowing */
+        }
+
+        @media (max-width: 768px) {
+            .section-container {
+                flex-direction: column;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1 class="text-4xl font-bold mb-8 text-center">Email Content Analyzer</h1>
         
-        <!-- File Upload Section -->
-        <div class="card p-6">
-            <h2 class="text-2xl font-semibold mb-4">Upload Emails</h2>
-            <div class="upload-area" id="dropZone">
-                <input type="file" id="fileInput" multiple accept=".eml,.txt" class="hidden">
-                <div class="text-lg mb-2">Drag and drop email files here</div>
-                <div class="text-sm text-gray-500">or</div>
-                <button class="btn btn-primary mt-2" onclick="document.getElementById('fileInput').click()">
-                    Select Files
-                </button>
+        <div class="section-container">
+            <!-- File Upload Section -->
+            <div class="section-half">
+                <div class="card p-6 h-full">
+                    <h2 class="text-2xl font-semibold mb-4">Upload Emails</h2>
+                    <div class="upload-area" id="dropZone">
+                        <input type="file" id="fileInput" multiple accept=".eml,.txt" class="hidden">
+                        <div class="text-lg mb-2">Drag and drop email files here</div>
+                        <div class="text-sm text-gray-500">or</div>
+                        <button class="btn btn-primary mt-2" onclick="document.getElementById('fileInput').click()">
+                            Select Files
+                        </button>
+                    </div>
+                    <div id="uploadedFiles" class="alert alert-success mt-4 hidden">
+                        Files uploaded successfully. Ready for analysis.
+                    </div>
+                </div>
             </div>
-            <div id="uploadedFiles" class="alert alert-success mt-4 hidden">
-                Files uploaded successfully. Ready for analysis.
+            
+            <!-- Search Terms Input -->
+            <div class="section-half">
+                <div class="card p-6 h-full">
+                    <h2 class="text-2xl font-semibold mb-4">Analysis Parameters</h2>
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Enter Search Terms (one per line)</span>
+                        </label>
+                        <textarea id="searchTerms" class="textarea textarea-bordered h-24" placeholder="Enter search terms here..."></textarea>
+                    </div>
+                    <button onclick="analyzeEmails()" class="btn btn-primary mt-4">Analyze Emails</button>
+                </div>
             </div>
-        </div>
-        
-        <!-- Search Terms Input -->
-        <div class="card p-6">
-            <h2 class="text-2xl font-semibold mb-4">Analysis Parameters</h2>
-            <div class="form-control">
-                <label class="label">
-                    <span class="label-text">Enter Search Terms (one per line)</span>
-                </label>
-                <textarea id="searchTerms" class="textarea textarea-bordered h-24" placeholder="Enter search terms here..."></textarea>
-            </div>
-            <button onclick="analyzeEmails()" class="btn btn-primary mt-4">Analyze Emails</button>
         </div>
 
         <!-- Status Messages -->
@@ -166,6 +209,12 @@
         <div id="results" class="space-y-8 hidden">
             <!-- Results Table -->
             <div class="card p-6">
+                <div class="filter-container">
+                    <div class="filter-toggle">
+                        <input type="checkbox" id="showMatchesOnly" class="toggle toggle-primary" onchange="filterResults()">
+                        <label for="showMatchesOnly" class="cursor-pointer">Show only emails with matches</label>
+                    </div>
+                </div>
                 <div class="table-container">
                     <table class="table w-full">
                         <thead>
@@ -303,16 +352,33 @@
 
         function displayResults(result) {
             document.getElementById('results').classList.remove('hidden');
+            window.emailResults = result.analysis_results; // Store results globally for filtering
+            filterResults(); // Initial display with filtering
+        }
 
+        function filterResults() {
+            const showMatchesOnly = document.getElementById('showMatchesOnly').checked;
             const resultsTable = document.getElementById('resultsTable');
-            resultsTable.innerHTML = result.analysis_results.map(email => {
+            
+            resultsTable.innerHTML = window.emailResults.filter(email => {
+                if (!showMatchesOnly) return true;
+                
                 let analysis;
                 try {
-                    // Check if analysis is already a JSON object
+                    analysis = typeof email.analysis === 'object' ? 
+                        email.analysis : JSON.parse(email.analysis);
+                    
+                    // Check if there are any matches
+                    return Object.values(analysis.semantic_matches || {}).some(matches => matches.length > 0);
+                } catch (error) {
+                    return false;
+                }
+            }).map(email => {
+                let analysis;
+                try {
                     analysis = typeof email.analysis === 'object' ? 
                         email.analysis : JSON.parse(email.analysis);
                 } catch (error) {
-                    console.error('Error parsing analysis:', error);
                     analysis = {
                         semantic_matches: {},
                         terms_found: []
