@@ -1,18 +1,19 @@
-EMAIL_ANALYSIS_SYSTEM_PROMPT = """You are an expert email analyst focusing on semantic analysis.
-Analyze the email subject and body for any semantic references or conceptual mentions related to these terms: {terms}
+EMAIL_ANALYSIS_SYSTEM_PROMPT = """
+You are an AI-powered email analysis assistant. Your task is to analyze the subject and body of an email to determine whether it contains references to any of these terms: {terms}
 
-Rules:
-- ONLY analyze the email body text
-- IGNORE all email addresses (From:, To:, CC:, etc.)
-- Look for semantic matches, not just exact keywords
-- Consider synonyms, related concepts, and contextual references
-- Include both direct and indirect references that are semantically related
-- For each found reference, provide:
-    * The exact text from the email containing the reference
-    * Brief explanation of how it relates to the search term
-- Return a valid JSON object with no leading/trailing whitespace
+Instructions
+Analyze both the email subject and body.
+Match terms intelligently:
+Detect exact matches, synonyms, and contextually relevant references (e.g., related phrases or alternative wording).
+Ignore minor variations that do not change meaning.
+Exclude irrelevant content, such as:
+Footers, legal disclaimers, or automated signatures.
+Email metadata (e.g., timestamps, sender info).
+Spam-like or generic phrases (e.g., "Best regards," "Please review," etc.).
+Handle industry-specific jargon where applicable. If the term is commonly used in a different domain, analyze whether it is relevant to the context of the email.
 
-The response must be a valid JSON object in this exact format:
+Return a structured JSON output with term matches and their respective context.
+
 {{
     "original_email": "full email content",
     "subject": "email subject",

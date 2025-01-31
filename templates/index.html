@@ -162,6 +162,92 @@
                 flex-direction: column;
             }
         }
+
+        .btn-blue {
+            background-color: #1e40af;
+            color: white;
+            border: none;
+        }
+        
+        .btn-blue:hover {
+            background-color: #1e3a8a;
+        }
+
+        .btn-outline-blue {
+            color: #1e40af;
+            border: 1px solid #1e40af;
+            background: transparent;
+        }
+
+        .btn-outline-blue:hover {
+            background-color: #1e40af;
+            color: white;
+        }
+
+        :root {
+            --primary-blue: #1e40af;
+            --primary-blue-hover: #1e3a8a;
+            --primary-blue-light: #3b82f6;
+            --success-green: #10b981;
+        }
+
+        .alert-success {
+            background-color: var(--success-green);
+            color: white;
+        }
+
+        .alert-info {
+            background-color: var(--primary-blue-light);
+            color: white;
+        }
+
+        .toggle-primary:checked {
+            background-color: var(--primary-blue) !important;
+            border-color: var(--primary-blue) !important;
+        }
+
+        .textarea-bordered:focus {
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 1px var(--primary-blue);
+        }
+
+        .upload-area {
+            border: 2px dashed #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--primary-blue);
+        }
+
+        .border-primary {
+            border-color: var(--primary-blue) !important;
+        }
+
+        .btn-blue {
+            background-color: var(--primary-blue);
+            color: white;
+            border: none;
+        }
+        
+        .btn-blue:hover {
+            background-color: var(--primary-blue-hover);
+        }
+
+        .btn-outline-blue {
+            color: var(--primary-blue);
+            border: 1px solid var(--primary-blue);
+            background: transparent;
+        }
+
+        .btn-outline-blue:hover {
+            background-color: var(--primary-blue);
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -177,7 +263,7 @@
                         <input type="file" id="fileInput" multiple accept=".eml,.txt" class="hidden">
                         <div class="text-lg mb-2">Drag and drop email files here</div>
                         <div class="text-sm text-gray-500">or</div>
-                        <button class="btn btn-primary mt-2" onclick="document.getElementById('fileInput').click()">
+                        <button class="btn btn-blue mt-2" onclick="document.getElementById('fileInput').click()">
                             Select Files
                         </button>
                     </div>
@@ -197,7 +283,7 @@
                         </label>
                         <textarea id="searchTerms" class="textarea textarea-bordered h-24" placeholder="Enter search terms here..."></textarea>
                     </div>
-                    <button onclick="analyzeEmails()" class="btn btn-primary mt-4">Analyze Emails</button>
+                    <button onclick="analyzeEmails()" class="btn btn-blue btn-sm mt-4">Analyze Emails</button>
                 </div>
             </div>
         </div>
@@ -212,7 +298,7 @@
                 <div class="filter-container">
                     <div class="filter-toggle">
                         <input type="checkbox" id="showMatchesOnly" class="toggle toggle-primary" onchange="filterResults()">
-                        <label for="showMatchesOnly" class="cursor-pointer">Show only emails with matches</label>
+                        <label for="showMatchesOnly" class="cursor-pointer text-gray-700">Show only emails with matches</label>
                     </div>
                 </div>
                 <div class="table-container">
@@ -329,6 +415,11 @@
                 return;
             }
 
+            // Clear previous results
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('resultsTable').innerHTML = '';
+            window.emailResults = [];
+
             showStatus('Analyzing emails...', 'info');
 
             try {
@@ -400,10 +491,10 @@
                         <td>${email.subject || 'No Subject'}</td>
                         <td class="analysis-cell">${relevantContent || 'No relevant content found'}</td>
                         <td class="space-y-2">
-                            <button onclick="viewEmail('${email.filename}')" class="btn btn-sm btn-outline w-full">
+                            <button onclick="viewEmail('${email.filename}')" class="btn btn-sm btn-outline-blue w-full">
                                 View
                             </button>
-                            <button onclick="convertToPDF('${email.filename}')" class="btn btn-sm btn-outline w-full">
+                            <button onclick="convertToPDF('${email.filename}')" class="btn btn-sm btn-outline-blue w-full">
                                 Convert to PDF
                             </button>
                         </td>

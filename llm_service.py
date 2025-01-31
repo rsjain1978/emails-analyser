@@ -52,6 +52,12 @@ Subject: {email_parts['subject']}
 
 Body:
 {email_parts['body']}"""
+
+            # Print prompts for debugging
+            print(colored("\nSystem Prompt:", "yellow"))
+            print(colored(system_prompt, "yellow"))
+            print(colored("\nUser Prompt:", "yellow"))
+            print(colored(user_prompt, "yellow"))
             
             completion = await self.client.chat.completions.create(
                 model=self.model,
