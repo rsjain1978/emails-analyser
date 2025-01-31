@@ -108,6 +108,13 @@
             height: 100%;
             background-color: rgba(0, 0, 0, 0.5);
             z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.show {
+            display: block;
+            opacity: 1;
         }
 
         .modal-content {
@@ -121,6 +128,12 @@
             overflow-y: auto;
             border-radius: 0.5rem;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transform: translateY(-20px);
+            transition: transform 0.3s ease;
+        }
+
+        .modal.show .modal-content {
+            transform: translateY(0);
         }
 
         .close-modal {
@@ -129,6 +142,23 @@
             right: 1rem;
             font-size: 1.5rem;
             cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background-color: #f3f4f6;
+            transition: all 0.3s ease;
+            border: none;
+            padding: 0;
+            line-height: 1;
+            z-index: 10;
+        }
+
+        .close-modal:hover {
+            background-color: #e5e7eb;
+            transform: scale(1.1);
         }
 
         .email-header {
@@ -318,9 +348,9 @@
     </div>
 
     <!-- Email View Modal -->
-    <div id="emailModal" class="modal">
+    <div id="emailModal" class="modal" role="dialog" aria-modal="true">
         <div class="modal-content">
-            <span class="close-modal" onclick="closeEmailModal()">&times;</span>
+            <button type="button" class="close-modal" id="closeModalBtn" aria-label="Close modal">&times;</button>
             <div class="email-header">
                 <h2 class="text-2xl font-semibold mb-4">Email Details</h2>
                 <p><strong>From:</strong> <span id="emailFrom"></span></p>
@@ -512,39 +542,76 @@
             status.textContent = message;
         }
 
-        async function viewEmail(filename) {
-            try {
-                showStatus('Loading email...', 'info');
-                const response = await fetch(`/view-email/${filename}`);
-                if (response.ok) {
-                    const emailData = await response.json();
-                    document.getElementById('emailFrom').textContent = emailData.from || 'N/A';
-                    document.getElementById('emailTo').textContent = emailData.to || 'N/A';
-                    document.getElementById('emailSubject').textContent = emailData.subject || 'No Subject';
-                    document.getElementById('emailDate').textContent = emailData.date || 'N/A';
-                    document.getElementById('emailBody').textContent = emailData.body || 'No content';
-                    emailModal.style.display = 'block';
-                    showStatus('', 'info'); // Clear status
-                } else {
-                    const error = await response.text();
-                    showStatus(`Error viewing email: ${error}`, 'error');
+        // Modal functionality
+        function closeModal() {
+            const modal = document.getElementById('emailModal');
+            modal.classList.remove('show');
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 300);
+        }
+
+        // Initialize modal functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('emailModal');
+            const closeBtn = document.getElementById('closeModalBtn');
+            const modalContent = modal.querySelector('.modal-content');
+
+            // Close button click handler
+            closeBtn.onclick = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeModal();
+            };
+
+            // Click outside modal to close
+            modal.onclick = function(e) {
+                if (e.target === modal) {
+                    closeModal();
                 }
-            } catch (error) {
-                console.error('Error viewing email:', error);
-                showStatus('Error viewing email', 'error');
-            }
-        }
+            };
 
-        function closeEmailModal() {
-            emailModal.style.display = 'none';
-        }
+            // Prevent clicks inside modal from closing it
+            modalContent.onclick = function(e) {
+                e.stopPropagation();
+            };
 
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            if (event.target === emailModal) {
-                closeEmailModal();
-            }
-        }
+            // Close on Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && modal.classList.contains('show')) {
+                    closeModal();
+                }
+            });
+
+            // Update viewEmail function
+            window.viewEmail = async function(filename) {
+                try {
+                    const response = await fetch(`/view-email/${filename}`);
+                    if (response.ok) {
+                        const emailData = await response.json();
+                        document.getElementById('emailFrom').textContent = emailData.from || 'N/A';
+                        document.getElementById('emailTo').textContent = emailData.to || 'N/A';
+                        document.getElementById('emailSubject').textContent = emailData.subject || 'No Subject';
+                        document.getElementById('emailDate').textContent = emailData.date || 'N/A';
+                        document.getElementById('emailBody').textContent = emailData.body || 'No content';
+                        
+                        modal.style.display = 'block';
+                        // Force reflow
+                        modal.offsetHeight;
+                        modal.classList.add('show');
+                        
+                        // Clear any existing status
+                        showStatus('');
+                    } else {
+                        const error = await response.text();
+                        showStatus(`Error viewing email: ${error}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error viewing email:', error);
+                    showStatus('Error viewing email', 'error');
+                }
+            };
+        });
 
         async function convertToPDF(filename) {
             try {
