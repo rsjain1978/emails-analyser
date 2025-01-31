@@ -7,17 +7,19 @@ from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 import uvicorn
 import webbrowser
-from email_generator import generate_emails
 from typing import List
 import aiofiles
 from termcolor import colored
 from pydantic import BaseModel
 from llm_service import LLMService
-from csv_handler import CSVHandler
 import shutil
 from fpdf import FPDF
 import email
 import mimetypes
+
+from dotenv import load_dotenv  
+load_dotenv()
+
 
 BATCH_SIZE = 10  # Maximum number of concurrent API calls
 
@@ -39,7 +41,6 @@ templates = Jinja2Templates(directory="templates")
 
 # Initialize services
 llm_service = LLMService()
-csv_handler = CSVHandler()
 
 class SearchRequest(BaseModel):
     search_terms: List[str]
@@ -194,26 +195,12 @@ async def analyze_emails(search_request: SearchRequest):
         print(colored("Starting email analysis in batches...", "blue"))
         analysis_results = await process_emails_in_batches(emails, search_request.search_terms)
         
-        # Generate CSV report
-        print(colored("Generating CSV report...", "blue"))
-        csv_path = await csv_handler.create_analysis_csv(
-            [email["content"] for email in emails],
-            [result["analysis"] for result in analysis_results],
-            search_request.search_terms
-        )
-        
-        # Generate overall summary
-        print(colored("Generating overall summary...", "blue"))
-        summary = await llm_service.generate_summary([email["content"] for email in emails], search_request.search_terms)
-        
         print(colored("Analysis complete!", "green"))
         
         return {
             "status": "success",
             "analysis_results": analysis_results,
-            "summary": summary,
-            "num_emails": len(emails),
-            "csv_path": csv_path
+            "num_emails": len(emails)
         }
     except Exception as e:
         print(colored(f"Error in analysis: {str(e)}", "red"))
