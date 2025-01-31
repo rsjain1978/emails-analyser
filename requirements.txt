@@ -1,0 +1,8 @@
+python-dotenv
+openai
+fastapi
+uvicorn
+termcolor
+aiofiles
+python-multipart
+fpdf 

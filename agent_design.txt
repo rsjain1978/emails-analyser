@@ -1,0 +1,11 @@
+Generate 10 emails are save them in a microsoft outlook email file format, save them in a folder called emails.
+
+use openai gpt4o-mini to generate the emails.
+
+use openai gpt4o-mini to analyze the emails and see if there is any personal information in the emails.
+
+use openai gpt4o-mini to generate a summary of the emails. one summary for all the emails.
+
+analyse emails in parallel for maximum speed.
+
+Console based output.

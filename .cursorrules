@@ -1,0 +1,106 @@
+Your task is to create tools in python and html web interface for user to use. 
+
+use daisy ui, tailwind and anime js where needed to save on code. But you can still use css and js if needed.
+use openai 1.0.0 or higher api always
+
+For text prompts use type of API call:
+
+from openai import AsyncOpenAI
+client = AsyncOpenAI()
+
+completion = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {
+            "role": "user",
+            "content": "Write a haiku about recursion in programming."
+        }
+    ]
+)
+
+For images use this type of API call:
+
+        receipt_task = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a receipt/invoice analysis expert. Extract all relevant information from the image and return it in a structured JSON format."
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Please analyze this receipt image and extract all relevant information."
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_base64}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            response_format={ "type": "json_object" }
+        )
+
+        
+print(completion.choices[0].message)
+
+check agent_design.txt for specification and built it. 
+
+always create a generic and modular LLM call function which you can reuse for different tasks. 
+
+if tasks are explained in new lines that means sequential processing. one after another.
+
+such as:
+take user input
+generate response
+write to file
+...
+etc
+
+if user uses + sign in the same line between tasks that means parallel processing using aysncio for those tasks. plus(+) sign always separates multiple parallel tasks. This is very important to understand and remember. 
+
+such as:
+summary of doc 1 + summary of doc 2 + summary of doc 3 + analysis etc...
+
+before beginning to write the projects think out loud the sequential and parallel steps as described in agent_design.txt paying attention to plus(+) sign separating parallel tasks. 
+
+write the agent code in agent.py file. 
+
+IGNORE: write a flow-chart of the agent logic in flow.html file.  dark mode, daisy ui beautifully artistic
+write a flow-chart of the agent logic as a mermaid chart in flow.md file. 
+
+Use Transformers library for phi4 model as follows
+
+# Use a pipeline as a high-level helper
+from transformers import pipeline
+
+messages = [
+    {"role": "user", "content": "Who are you?"},
+]
+pipe = pipeline("text-generation", model="microsoft/phi-4", trust_remote_code=True)
+pipe(messages)
+
+
+GENERAL RULES:
+load env variables from existing .env file
+always use gpt-4o-mini model
+try and follow UI design and styles as on @https://www.fidelity.co.uk/ 
+map the static folder to the /static route, create static folder if it does not exist
+fastapi endpoint to correctly handle the JSON request body.
+have termcolor printing every step of the way to inform the user
+every time we use with open use encoding="utf-8"
+always use try except blocks with descriptive prints where necessary. have informative error printing(incuding the error itself)
+lets implement every project with seperations of concerns in mind
+create and update requirements.txt without version numbers
+ALWAYS MAKE SURE TO AWAIT ALL ASYNC TASKS
+always create a generic and modular ASYNC LLM call function which you can reuse for different tasks and models
+make sure all async calls are awaited in theie respective functions
+add debug prints every every logical step of the code with different colors for different levels of the code
+You must always design the fastapi server to launch the app in the browser while launching the server.
+

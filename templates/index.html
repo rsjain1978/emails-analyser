@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Content Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@3.9.4/dist/full.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/animejs@3.2.1/lib/anime.min.js"></script>
+    <style>
+        body {
+            background-color: white;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1.5rem;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+            vertical-align: top;
+        }
+        
+        td.analysis-cell {
+            max-width: 400px;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+        
+        th {
+            background-color: #f9fafb;
+            font-weight: 600;
+        }
+        
+        .btn {
+            text-transform: none;
+        }
+        
+        .upload-area {
+            border: 2px dashed #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-area:hover {
+            border-color: #6b7280;
+        }
+        
+        .uploaded-files {
+            margin-top: 1rem;
+            padding: 1rem;
+            background-color: #f9fafb;
+            border-radius: 0.5rem;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            position: relative;
+            background-color: white;
+            margin: 2rem auto;
+            padding: 2rem;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .email-header {
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .email-header p {
+            margin: 0.5rem 0;
+        }
+
+        .email-body {
+            white-space: pre-wrap;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-4xl font-bold mb-8 text-center">Email Content Analyzer</h1>
+        
+        <!-- File Upload Section -->
+        <div class="card p-6">
+            <h2 class="text-2xl font-semibold mb-4">Upload Emails</h2>
+            <div class="upload-area" id="dropZone">
+                <input type="file" id="fileInput" multiple accept=".eml,.txt" class="hidden">
+                <div class="text-lg mb-2">Drag and drop email files here</div>
+                <div class="text-sm text-gray-500">or</div>
+                <button class="btn btn-primary mt-2" onclick="document.getElementById('fileInput').click()">
+                    Select Files
+                </button>
+            </div>
+            <div id="uploadedFiles" class="uploaded-files hidden">
+                <h3 class="font-semibold mb-2">Uploaded Files:</h3>
+                <ul id="fileList" class="list-disc list-inside"></ul>
+            </div>
+        </div>
+        
+        <!-- Search Terms Input -->
+        <div class="card p-6">
+            <h2 class="text-2xl font-semibold mb-4">Analysis Parameters</h2>
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">Enter Search Terms (one per line)</span>
+                </label>
+                <textarea id="searchTerms" class="textarea textarea-bordered h-24" placeholder="Enter search terms here..."></textarea>
+            </div>
+            <button onclick="analyzeEmails()" class="btn btn-primary mt-4">Analyze Emails</button>
+        </div>
+
+        <!-- Status Messages -->
+        <div id="status" class="alert mb-8 hidden"></div>
+
+        <!-- Results Section -->
+        <div id="results" class="space-y-8 hidden">
+            <!-- Download CSV -->
+            <div class="card p-6">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-2xl font-semibold">Results</h2>
+                    <a id="csvDownload" href="#" class="btn btn-primary" download>Download CSV</a>
+                </div>
+            </div>
+
+            <!-- Results Table -->
+            <div class="card p-6">
+                <div class="table-container">
+                    <table class="table w-full">
+                        <thead>
+                            <tr>
+                                <th class="w-1/4">Subject</th>
+                                <th class="w-1/2">Relevant Content</th>
+                                <th class="w-1/4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Email View Modal -->
+    <div id="emailModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeEmailModal()">&times;</span>
+            <div class="email-header">
+                <h2 class="text-2xl font-semibold mb-4">Email Details</h2>
+                <p><strong>From:</strong> <span id="emailFrom"></span></p>
+                <p><strong>To:</strong> <span id="emailTo"></span></p>
+                <p><strong>Subject:</strong> <span id="emailSubject"></span></p>
+                <p><strong>Date:</strong> <span id="emailDate"></span></p>
+            </div>
+            <div id="emailBody" class="email-body"></div>
+        </div>
+    </div>
+
+    <script>
+        // File upload handling
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const uploadedFiles = document.getElementById('uploadedFiles');
+        const fileList = document.getElementById('fileList');
+        const emailModal = document.getElementById('emailModal');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropZone.classList.add('border-primary');
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove('border-primary');
+        }
+
+        dropZone.addEventListener('drop', handleDrop, false);
+        fileInput.addEventListener('change', handleFileSelect, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            handleFiles(files);
+        }
+
+        async function handleFiles(files) {
+            const formData = new FormData();
+            for (const file of files) {
+                formData.append('files', file);
+            }
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    showUploadedFiles(result.uploaded_files);
+                }
+            } catch (error) {
+                console.error('Error uploading files:', error);
+                showStatus('Error uploading files', 'error');
+            }
+        }
+
+        function showUploadedFiles(files) {
+            uploadedFiles.classList.remove('hidden');
+            fileList.innerHTML = files.map(file => `<li>${file}</li>`).join('');
+        }
+
+        async function analyzeEmails() {
+            const searchTerms = document.getElementById('searchTerms').value
+                .split('\n')
+                .map(term => term.trim())
+                .filter(term => term);
+
+            if (searchTerms.length === 0) {
+                showStatus('Please enter at least one search term', 'warning');
+                return;
+            }
+
+            showStatus('Analyzing emails...', 'info');
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ search_terms: searchTerms })
+                });
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    displayResults(result);
+                }
+            } catch (error) {
+                console.error('Error analyzing emails:', error);
+                showStatus('Error analyzing emails', 'error');
+            }
+        }
+
+        function displayResults(result) {
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('csvDownload').href = result.csv_path;
+
+            const resultsTable = document.getElementById('resultsTable');
+            resultsTable.innerHTML = result.analysis_results.map(email => {
+                const analysis = JSON.parse(email.analysis);
+                const relevantContent = Object.entries(analysis.semantic_matches)
+                    .map(([term, matches]) => {
+                        return matches.map(match => `
+                            <div class="mb-2">
+                                <div class="font-semibold text-sm">${term}:</div>
+                                <div class="text-sm">${match.text}</div>
+                            </div>
+                        `).join('');
+                    }).join('');
+
+                return `
+                    <tr>
+                        <td>${email.subject}</td>
+                        <td class="analysis-cell">${relevantContent}</td>
+                        <td class="space-y-2">
+                            <button onclick="viewEmail('${email.filename}')" class="btn btn-sm btn-outline w-full">
+                                View
+                            </button>
+                            <button onclick="convertToPDF('${email.filename}')" class="btn btn-sm btn-outline w-full">
+                                Convert to PDF
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            showStatus('Analysis complete!', 'success');
+        }
+
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.classList.remove('hidden', 'alert-info', 'alert-success', 'alert-warning', 'alert-error');
+            status.classList.add(`alert-${type}`);
+            status.textContent = message;
+        }
+
+        async function viewEmail(filename) {
+            try {
+                const response = await fetch(`/view-email/${filename}`);
+                if (response.ok) {
+                    const emailData = await response.json();
+                    document.getElementById('emailFrom').textContent = emailData.from;
+                    document.getElementById('emailTo').textContent = emailData.to;
+                    document.getElementById('emailSubject').textContent = emailData.subject;
+                    document.getElementById('emailDate').textContent = emailData.date;
+                    document.getElementById('emailBody').textContent = emailData.body;
+                    emailModal.style.display = 'block';
+                } else {
+                    showStatus('Error viewing email', 'error');
+                }
+            } catch (error) {
+                console.error('Error viewing email:', error);
+                showStatus('Error viewing email', 'error');
+            }
+        }
+
+        function closeEmailModal() {
+            emailModal.style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            if (event.target === emailModal) {
+                closeEmailModal();
+            }
+        }
+
+        async function convertToPDF(filename) {
+            try {
+                const response = await fetch(`/convert-to-pdf/${filename}`);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${filename}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    showStatus('Error converting to PDF', 'error');
+                }
+            } catch (error) {
+                console.error('Error converting to PDF:', error);
+                showStatus('Error converting to PDF', 'error');
+            }
+        }
+    </script>
+</body>
+</html> 
