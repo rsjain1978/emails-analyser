@@ -11,7 +11,7 @@ load_dotenv()
 class LLMService:
     def __init__(self):
         self.client = AsyncOpenAI()
-        self.model = "gpt-4o-mini"  # Default model
+        self.MODEL = "gpt-4o"  # Using the specified model
 
     def extract_email_content(self, email_raw: str) -> Dict[str, str]:
         """Extract subject and body from email, removing headers"""
@@ -39,55 +39,72 @@ class LLMService:
                 "body": email_raw  # Fallback to using entire content
             }
 
-    async def analyze_email_content(self, email_content: str, search_terms: List[str]) -> str:
-        """Analyze email content for semantic references to search terms"""
+    async def analyze_email_content(self, email_content: str, search_terms: List[str]) -> dict:
+        """Analyze email content for semantic matches with search terms"""
         try:
-            # Extract subject and body
-            email_parts = self.extract_email_content(email_content)
-            
-            system_prompt = EMAIL_ANALYSIS_SYSTEM_PROMPT.format(terms=', '.join(search_terms))
-            user_prompt = f"""Analyze this email for semantic references to the specified terms:
+            system_prompt = """You are an expert email analyzer with deep understanding of business context and semantic meaning.
+Your task is to analyze emails and find relevant content based on search terms, considering:
 
-Subject: {email_parts['subject']}
+1. Semantic Relevance: Look for content that matches the meaning and intent of search terms, not just exact matches
+2. Context Understanding: Consider the broader context of discussions and implied meanings
+3. Business Intelligence: Identify business-relevant information related to the search terms
+4. Key Information: Extract important details even if they use different wording than the search terms
+5. Related Concepts: Include relevant content that uses synonyms or related business concepts
+6. Indirect References: Capture indirect mentions and implied connections to the search terms
 
-Body:
-{email_parts['body']}"""
+For each search term:
+- Find ALL relevant content, including semantic matches and contextually related information
+- Include surrounding context to ensure the meaning is clear
+- Consider business implications and relationships
+- Look for both explicit and implicit references
+- Consider industry-specific terminology and jargon
 
-            # Print prompts for debugging
-            print(colored("\nSystem Prompt:", "yellow"))
-            print(colored(system_prompt, "yellow"))
-            print(colored("\nUser Prompt:", "yellow"))
-            print(colored(user_prompt, "yellow"))
-            
+Return a structured analysis with:
+1. Semantic matches for each term (with context)
+2. Overall relevance score (0-100)
+3. Key insights found
+4. Important context that might not directly match but is relevant"""
+
+            prompt = f"""Analyze this email content for the following search terms: {', '.join(search_terms)}
+
+Email Content:
+{email_content}
+
+Provide a detailed analysis in JSON format with the following structure:
+{{
+    "semantic_matches": {{
+        "term": [
+            {{
+                "text": "relevant text snippet",
+                "context": "surrounding context",
+                "relevance": "explanation of relevance"
+            }}
+        ]
+    }},
+    "overall_relevance_score": number,
+    "key_insights": [
+        "insight 1",
+        "insight 2"
+    ],
+    "important_context": [
+        "context 1",
+        "context 2"
+    ]
+}}"""
+
             completion = await self.client.chat.completions.create(
-                model=self.model,
+                model=self.MODEL,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
+                    {"role": "user", "content": prompt}
                 ],
-                response_format={ "type": "json_object" }
+                response_format={"type": "json_object"}
             )
-            
-            # Get the response content and ensure it's valid JSON
-            response_content = completion.choices[0].message.content.strip()
-            
-            # Validate JSON response
-            try:
-                json_response = json.loads(response_content)
-                return json.dumps(json_response)  # Return properly formatted JSON string
-            except json.JSONDecodeError as e:
-                print(colored(f"Invalid JSON response from LLM: {response_content}", "red"))
-                # Return a valid fallback JSON response
-                fallback_response = {
-                    "original_email": email_content,
-                    "subject": email_parts["subject"],
-                    "terms_found": [],
-                    "semantic_matches": {}
-                }
-                return json.dumps(fallback_response)
-            
+
+            return completion.choices[0].message.content
+
         except Exception as e:
-            print(colored(f"Error in LLM service: {str(e)}", "red"))
+            print(colored(f"Error in analyze_email_content: {str(e)}", "red"))
             raise
 
     async def generate_summary(self, all_emails: List[str], search_terms: List[str]) -> str:
@@ -105,7 +122,7 @@ Body:
             user_prompt = f"Generate a semantic analysis summary for these emails:\n\n" + "\n---\n".join(formatted_emails)
             
             completion = await self.client.chat.completions.create(
-                model=self.model,
+                model=self.MODEL,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}

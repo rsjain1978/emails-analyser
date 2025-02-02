@@ -97,53 +97,71 @@ async def process_emails_in_batches(emails: List[dict], search_terms: List[str])
         raise
 
 async def email_to_pdf(email_path: str) -> str:
-    """Convert email to PDF"""
+    """Convert .msg email to PDF"""
     try:
-        # Read email file
-        with open(email_path, 'r', encoding='utf-8') as f:
-            email_content = f.read()
-            
-        # Parse email
-        email_message = email.message_from_string(email_content)
+        if not str(email_path).lower().endswith('.msg'):
+            raise ValueError("Only .msg files are supported")
+
+        # Read email content
+        email_data = await read_email_content(Path(email_path))
         
         # Create PDF
         pdf = FPDF()
         pdf.add_page()
+        
+        # Set font for the whole document
         pdf.set_font("Arial", size=12)
+        
+        # Add title
+        pdf.set_font("Arial", 'B', 16)
+        pdf.cell(0, 10, "Email Details", ln=True)
+        pdf.ln(5)
         
         # Add headers
-        pdf.set_font("Arial", 'B', 14)
-        pdf.cell(0, 10, "Email Details", ln=True)
-        pdf.set_font("Arial", size=12)
-        
         headers = [
-            ("From", email_message["from"]),
-            ("To", email_message["to"]),
-            ("Subject", email_message["subject"]),
-            ("Date", email_message["date"])
+            ("From", email_data["from"]),
+            ("To", email_data["to"]),
+            ("Subject", email_data["subject"]),
+            ("Date", email_data["date"])
         ]
         
+        # Add header information
+        pdf.set_font("Arial", size=12)
         for header, value in headers:
             if value:
                 pdf.set_font("Arial", 'B', 12)
                 pdf.cell(20, 10, f"{header}:", 0)
                 pdf.set_font("Arial", size=12)
-                pdf.cell(0, 10, value, ln=True)
+                # Ensure value is string and handle encoding
+                pdf.cell(0, 10, str(value).encode('latin-1', 'replace').decode('latin-1'), ln=True)
         
         # Add body
         pdf.ln(10)
         pdf.set_font("Arial", size=12)
-        body = email_message.get_payload()
-        pdf.multi_cell(0, 10, body)
+        
+        # Handle body text
+        body = email_data["body"]
+        if body:
+            # Convert body to string if it isn't already
+            if not isinstance(body, str):
+                body = str(body)
+            
+            # Replace problematic characters and encode for PDF
+            body = body.encode('latin-1', 'replace').decode('latin-1')
+            
+            # Split body into lines and add to PDF
+            lines = body.split('\n')
+            for line in lines:
+                pdf.multi_cell(0, 10, line)
         
         # Save PDF
-        pdf_path = email_path.replace('.eml', '.pdf')
+        pdf_path = email_path.replace('.msg', '.pdf')
         pdf.output(pdf_path)
         
         return pdf_path
     except Exception as e:
         print(colored(f"Error converting email to PDF: {str(e)}", "red"))
-        raise HTTPException(status_code=500, detail="Error converting email to PDF")
+        raise HTTPException(status_code=500, detail=f"Error converting email to PDF: {str(e)}")
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
@@ -154,12 +172,9 @@ async def upload_files(files: List[UploadFile] = File(...)):
     try:
         uploaded_files = []
         for file in files:
-            # Check if file is an email file based on extension
-            mime_type, _ = mimetypes.guess_type(file.filename)
-            is_text = mime_type == 'text/plain'
-            is_email = file.filename.lower().endswith(('.eml', '.msg'))
-            
-            if not (is_text or is_email):
+            # Only accept .msg files
+            if not file.filename.lower().endswith('.msg'):
+                print(colored(f"Skipping {file.filename} - not a .msg file", "yellow"))
                 continue
                 
             file_path = Path("uploaded_emails") / file.filename
@@ -167,82 +182,63 @@ async def upload_files(files: List[UploadFile] = File(...)):
                 content = await file.read()
                 await f.write(content)
             uploaded_files.append(file.filename)
+            print(colored(f"Successfully uploaded: {file.filename}", "green"))
             
         return {"status": "success", "uploaded_files": uploaded_files}
     except Exception as e:
+        print(colored(f"Error uploading files: {str(e)}", "red"))
         raise HTTPException(status_code=500, detail=str(e))
 
 async def read_email_content(file_path: Path) -> dict:
-    """Read and parse email content based on file extension"""
+    """Read and parse .msg email content"""
+    msg = None
     try:
-        file_ext = file_path.suffix.lower()
+        if not str(file_path).lower().endswith('.msg'):
+            raise ValueError("Only .msg files are supported")
+
+        # Parse .msg file
+        msg = extract_msg.Message(str(file_path))
         
-        if file_ext == '.msg':
-            # Handle .msg files using extract_msg
-            msg = extract_msg.Message(str(file_path))
-            # Ensure proper encoding of msg content
-            try:
-                body = msg.body
-                if body is None:
-                    body = ""
-                # Handle potential encoding issues
-                if isinstance(body, bytes):
-                    body = body.decode('utf-8', errors='replace')
-                elif not isinstance(body, str):
-                    body = str(body)
-            except Exception as e:
-                print(colored(f"Error decoding msg body: {str(e)}", "yellow"))
-                body = "[Error: Could not decode email body]"
-
-            return {
-                "from": str(msg.sender or ""),
-                "to": str(msg.to or ""),
-                "subject": str(msg.subject or ""),
-                "date": str(msg.date or ""),
-                "body": body
-            }
+        # Get all the data we need while the file is open
+        sender = str(msg.sender or "")
+        to = str(msg.to or "")
+        subject = str(msg.subject or "")
+        date = str(msg.date or "")
+        body = msg.body or ""
+        
+        # Convert body to string and handle encoding
+        if isinstance(body, bytes):
+            body = body.decode('utf-8', errors='replace')
         else:
-            # Handle .eml and .txt files
-            async with aiofiles.open(file_path, mode='r', encoding='utf-8', errors='replace') as f:
-                content = await f.read()
-                email_message = email.message_from_string(content)
-                
-                # Handle potential multipart messages
-                if email_message.is_multipart():
-                    body = ""
-                    for part in email_message.walk():
-                        if part.get_content_type() == "text/plain":
-                            try:
-                                part_body = part.get_payload(decode=True).decode('utf-8', errors='replace')
-                                body += part_body + "\n"
-                            except Exception as e:
-                                print(colored(f"Error decoding email part: {str(e)}", "yellow"))
-                                continue
-                else:
-                    try:
-                        body = email_message.get_payload(decode=True).decode('utf-8', errors='replace')
-                    except:
-                        body = email_message.get_payload()
+            body = str(body)
 
-                return {
-                    "from": str(email_message.get("from", "")),
-                    "to": str(email_message.get("to", "")),
-                    "subject": str(email_message.get("subject", "")),
-                    "date": str(email_message.get("date", "")),
-                    "body": body
-                }
+        # Print debug info
+        print(colored(f"Email content length: {len(body)}", "cyan"))
+        print(colored(f"First 100 chars: {body[:100]}", "cyan"))
+
+        return {
+            "from": sender,
+            "to": to,
+            "subject": subject,
+            "date": date,
+            "body": body
+        }
     except Exception as e:
         print(colored(f"Error reading email {file_path}: {str(e)}", "red"))
         raise
+    finally:
+        if msg is not None:
+            try:
+                msg.close()
+            except Exception as e:
+                print(colored(f"Warning: Error closing msg file: {str(e)}", "yellow"))
 
 @app.post("/analyze")
 async def analyze_emails(search_request: SearchRequest):
     try:
-        # Read all emails from the uploaded_emails directory
+        # Read all .msg emails from the uploaded_emails directory
         emails_dir = Path("uploaded_emails")
-        email_files = []
-        for ext in ['.eml', '.msg', '.txt']:
-            email_files.extend(emails_dir.glob(f'*{ext}'))
+        email_files = list(emails_dir.glob("*.msg"))
         
         emails = []
         for file in email_files:
@@ -311,17 +307,45 @@ async def view_email(filename: str):
 async def delete_all_emails():
     try:
         emails_dir = Path("uploaded_emails")
-        files = list(emails_dir.glob("*.*")) + list(emails_dir.glob("*.txt"))
+        files = list(emails_dir.glob("*.*"))
+        
+        deleted_files = []
+        failed_files = []
         
         for file in files:
             try:
-                file.unlink()
+                # Try multiple times with a delay
+                max_attempts = 3
+                for attempt in range(max_attempts):
+                    try:
+                        file.unlink()
+                        deleted_files.append(str(file))
+                        break
+                    except PermissionError:
+                        if attempt < max_attempts - 1:
+                            print(colored(f"Attempt {attempt + 1}: File {file} is locked, waiting before retry...", "yellow"))
+                            await asyncio.sleep(1)  # Wait 1 second before retrying
+                        else:
+                            raise
             except Exception as e:
-                print(colored(f"Error deleting file {file}: {str(e)}", "red"))
+                error_msg = f"Error deleting file {file}: {str(e)}"
+                print(colored(error_msg, "red"))
+                failed_files.append({"file": str(file), "error": str(e)})
         
-        return {"status": "success", "message": "All emails deleted successfully"}
+        response = {
+            "status": "success",
+            "deleted_files": deleted_files,
+            "failed_files": failed_files
+        }
+        
+        if failed_files:
+            response["message"] = f"Deleted {len(deleted_files)} files, {len(failed_files)} files failed to delete"
+        else:
+            response["message"] = f"Successfully deleted {len(deleted_files)} files"
+            
+        return response
     except Exception as e:
-        print(colored(f"Error deleting emails: {str(e)}", "red"))
+        print(colored(f"Error in delete_all_emails: {str(e)}", "red"))
         raise HTTPException(status_code=500, detail=str(e))
 
 def open_browser():

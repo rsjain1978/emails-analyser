@@ -304,8 +304,9 @@
                         </button>
                     </div>
                     <div class="upload-area" id="dropZone">
-                        <input type="file" id="fileInput" multiple accept=".eml,.txt" class="hidden">
+                        <input type="file" id="fileInput" multiple accept=".msg" class="hidden">
                         <div class="text-lg mb-2">Drag and drop email files here</div>
+                        <div class="text-sm text-gray-500 mb-2">Supported format: .msg (Outlook Message)</div>
                         <div class="text-sm text-gray-500">or</div>
                         <button class="btn btn-blue mt-2" onclick="document.getElementById('fileInput').click()">
                             Select Files
@@ -424,11 +425,25 @@
 
         async function handleFiles(files) {
             const formData = new FormData();
+            let validFiles = 0;
+            
             for (const file of files) {
-                formData.append('files', file);
+                const ext = file.name.toLowerCase().split('.').pop();
+                if (ext === 'msg') {
+                    formData.append('files', file);
+                    validFiles++;
+                } else {
+                    console.warn(`Skipping unsupported file: ${file.name}`);
+                }
+            }
+
+            if (validFiles === 0) {
+                showStatus('No valid email files selected. Please upload .msg files only.', 'warning');
+                return;
             }
 
             try {
+                showStatus('Uploading files...', 'info');
                 const response = await fetch('/upload', {
                     method: 'POST',
                     body: formData
@@ -437,6 +452,7 @@
                 const result = await response.json();
                 if (result.status === 'success') {
                     showUploadedFiles(result.uploaded_files);
+                    showStatus(`Successfully uploaded ${result.uploaded_files.length} file(s)`, 'success');
                 }
             } catch (error) {
                 console.error('Error uploading files:', error);
