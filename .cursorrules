@@ -5,6 +5,8 @@ use openai 1.0.0 or higher api always
 
 For text prompts use type of API call:
 
+You will use only this type of API call:
+
 from openai import AsyncOpenAI
 client = AsyncOpenAI()
 
@@ -18,6 +20,14 @@ completion = client.chat.completions.create(
         }
     ]
 )
+
+gpt-4o is a valid model name, do not use gpt-4
+
+use json mode for openai api calls. response_format={"type": "json_object"}
+
+print(completion.choices[0].message)
+
+always create a generic and modular LLM call function which you can reuse for different tasks. 
 
 For images use this type of API call:
 

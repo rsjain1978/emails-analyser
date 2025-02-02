@@ -278,6 +278,15 @@
             background-color: var(--primary-blue);
             color: white;
         }
+
+        .btn-danger {
+            background-color: #dc2626;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background-color: #b91c1c;
+        }
     </style>
 </head>
 <body>
@@ -288,7 +297,12 @@
             <!-- File Upload Section -->
             <div class="section-half">
                 <div class="card p-6 h-full">
-                    <h2 class="text-2xl font-semibold mb-4">Upload Emails</h2>
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-semibold">Upload Emails</h2>
+                        <button onclick="deleteAllEmails()" class="btn btn-danger btn-sm">
+                            Delete All Emails
+                        </button>
+                    </div>
                     <div class="upload-area" id="dropZone">
                         <input type="file" id="fileInput" multiple accept=".eml,.txt" class="hidden">
                         <div class="text-lg mb-2">Drag and drop email files here</div>
@@ -632,6 +646,37 @@
             } catch (error) {
                 console.error('Error converting to PDF:', error);
                 showStatus('Error converting to PDF', 'error');
+            }
+        }
+
+        async function deleteAllEmails() {
+            if (!confirm('Are you sure you want to delete all uploaded emails? This action cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/delete-all-emails', {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    // Clear the file input
+                    document.getElementById('fileInput').value = '';
+                    // Hide the upload success message
+                    document.getElementById('uploadedFiles').classList.add('hidden');
+                    // Clear any results
+                    document.getElementById('results').classList.add('hidden');
+                    document.getElementById('resultsTable').innerHTML = '';
+                    window.emailResults = [];
+                    // Show success message
+                    showStatus('All emails deleted successfully', 'success');
+                } else {
+                    const error = await response.text();
+                    showStatus(`Error deleting emails: ${error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting emails:', error);
+                showStatus('Error deleting emails', 'error');
             }
         }
     </script>

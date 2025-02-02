@@ -5,4 +5,5 @@ uvicorn
 termcolor
 aiofiles
 python-multipart
-fpdf 
+fpdf
+extract-msg 

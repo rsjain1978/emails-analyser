@@ -16,6 +16,7 @@ import shutil
 from fpdf import FPDF
 import email
 import mimetypes
+import extract_msg  # Add this import for .msg files
 
 from dotenv import load_dotenv  
 load_dotenv()
@@ -171,23 +172,66 @@ async def upload_files(files: List[UploadFile] = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+async def read_email_content(file_path: Path) -> dict:
+    """Read and parse email content based on file extension"""
+    try:
+        file_ext = file_path.suffix.lower()
+        
+        if file_ext == '.msg':
+            # Handle .msg files using extract_msg
+            msg = extract_msg.Message(str(file_path))
+            return {
+                "from": msg.sender,
+                "to": msg.to,
+                "subject": msg.subject,
+                "date": msg.date,
+                "body": msg.body
+            }
+        else:
+            # Handle .eml and .txt files
+            async with aiofiles.open(file_path, mode='r', encoding='utf-8') as f:
+                content = await f.read()
+                email_message = email.message_from_string(content)
+                return {
+                    "from": email_message["from"],
+                    "to": email_message["to"],
+                    "subject": email_message["subject"],
+                    "date": email_message["date"],
+                    "body": email_message.get_payload()
+                }
+    except Exception as e:
+        print(colored(f"Error reading email {file_path}: {str(e)}", "red"))
+        raise
+
 @app.post("/analyze")
 async def analyze_emails(search_request: SearchRequest):
     try:
         # Read all emails from the uploaded_emails directory
         emails_dir = Path("uploaded_emails")
-        email_files = list(emails_dir.glob("*.eml")) + list(emails_dir.glob("*.txt"))
+        email_files = []
+        for ext in ['.eml', '.msg', '.txt']:
+            email_files.extend(emails_dir.glob(f'*{ext}'))
         
         emails = []
         for file in email_files:
-            async with aiofiles.open(file, mode='r', encoding='utf-8') as f:
-                content = await f.read()
-                email_message = email.message_from_string(content)
+            try:
+                email_data = await read_email_content(file)
+                # Format content for analysis
+                formatted_content = f"""From: {email_data['from']}
+To: {email_data['to']}
+Subject: {email_data['subject']}
+Date: {email_data['date']}
+
+{email_data['body']}"""
+                
                 emails.append({
                     "filename": file.name,
-                    "subject": email_message["subject"],
-                    "content": content
+                    "subject": email_data['subject'],
+                    "content": formatted_content
                 })
+            except Exception as e:
+                print(colored(f"Error processing {file.name}: {str(e)}", "red"))
+                continue
 
         print(colored(f"Found {len(emails)} emails to analyze", "blue"))
         
@@ -224,19 +268,28 @@ async def view_email(filename: str):
         email_path = Path("uploaded_emails") / filename
         if not email_path.exists():
             raise HTTPException(status_code=404, detail="Email file not found")
-            
-        async with aiofiles.open(email_path, mode='r', encoding='utf-8') as f:
-            content = await f.read()
-            email_message = email.message_from_string(content)
-            
-            return {
-                "from": email_message["from"],
-                "to": email_message["to"],
-                "subject": email_message["subject"],
-                "date": email_message["date"],
-                "body": email_message.get_payload()
-            }
+        
+        email_data = await read_email_content(email_path)
+        return email_data
     except Exception as e:
+        print(colored(f"Error viewing email: {str(e)}", "red"))
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/delete-all-emails")
+async def delete_all_emails():
+    try:
+        emails_dir = Path("uploaded_emails")
+        files = list(emails_dir.glob("*.*")) + list(emails_dir.glob("*.txt"))
+        
+        for file in files:
+            try:
+                file.unlink()
+            except Exception as e:
+                print(colored(f"Error deleting file {file}: {str(e)}", "red"))
+        
+        return {"status": "success", "message": "All emails deleted successfully"}
+    except Exception as e:
+        print(colored(f"Error deleting emails: {str(e)}", "red"))
         raise HTTPException(status_code=500, detail=str(e))
 
 def open_browser():
