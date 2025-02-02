@@ -46,11 +46,11 @@ llm_service = LLMService()
 class SearchRequest(BaseModel):
     search_terms: List[str]
 
-async def process_batch(emails_batch: List[str], search_terms: List[str]) -> List[dict]:
+async def process_batch(emails_batch: List[dict], search_terms: List[str]) -> List[dict]:
     """Process a batch of emails with concurrent API calls"""
     try:
         print(colored(f"Starting analysis for {len(emails_batch)} emails...", "cyan"))
-        tasks = [llm_service.analyze_email_content(email, search_terms) for email in emails_batch]
+        tasks = [llm_service.analyze_email_content(email["content"], search_terms) for email in emails_batch]
         
         # Wait for all tasks in this batch to complete
         results = await asyncio.gather(*tasks)
@@ -67,7 +67,7 @@ async def process_emails_in_batches(emails: List[dict], search_terms: List[str])
         
         for i in range(0, len(emails), BATCH_SIZE):
             batch_num = i // BATCH_SIZE + 1
-            batch = [email["content"] for email in emails[i:i + BATCH_SIZE]]
+            batch = emails[i:i + BATCH_SIZE]
             print(colored(f"\nProcessing batch {batch_num}/{total_batches} ({len(batch)} emails)...", "blue"))
             
             try:
@@ -180,24 +180,56 @@ async def read_email_content(file_path: Path) -> dict:
         if file_ext == '.msg':
             # Handle .msg files using extract_msg
             msg = extract_msg.Message(str(file_path))
+            # Ensure proper encoding of msg content
+            try:
+                body = msg.body
+                if body is None:
+                    body = ""
+                # Handle potential encoding issues
+                if isinstance(body, bytes):
+                    body = body.decode('utf-8', errors='replace')
+                elif not isinstance(body, str):
+                    body = str(body)
+            except Exception as e:
+                print(colored(f"Error decoding msg body: {str(e)}", "yellow"))
+                body = "[Error: Could not decode email body]"
+
             return {
-                "from": msg.sender,
-                "to": msg.to,
-                "subject": msg.subject,
-                "date": msg.date,
-                "body": msg.body
+                "from": str(msg.sender or ""),
+                "to": str(msg.to or ""),
+                "subject": str(msg.subject or ""),
+                "date": str(msg.date or ""),
+                "body": body
             }
         else:
             # Handle .eml and .txt files
-            async with aiofiles.open(file_path, mode='r', encoding='utf-8') as f:
+            async with aiofiles.open(file_path, mode='r', encoding='utf-8', errors='replace') as f:
                 content = await f.read()
                 email_message = email.message_from_string(content)
+                
+                # Handle potential multipart messages
+                if email_message.is_multipart():
+                    body = ""
+                    for part in email_message.walk():
+                        if part.get_content_type() == "text/plain":
+                            try:
+                                part_body = part.get_payload(decode=True).decode('utf-8', errors='replace')
+                                body += part_body + "\n"
+                            except Exception as e:
+                                print(colored(f"Error decoding email part: {str(e)}", "yellow"))
+                                continue
+                else:
+                    try:
+                        body = email_message.get_payload(decode=True).decode('utf-8', errors='replace')
+                    except:
+                        body = email_message.get_payload()
+
                 return {
-                    "from": email_message["from"],
-                    "to": email_message["to"],
-                    "subject": email_message["subject"],
-                    "date": email_message["date"],
-                    "body": email_message.get_payload()
+                    "from": str(email_message.get("from", "")),
+                    "to": str(email_message.get("to", "")),
+                    "subject": str(email_message.get("subject", "")),
+                    "date": str(email_message.get("date", "")),
+                    "body": body
                 }
     except Exception as e:
         print(colored(f"Error reading email {file_path}: {str(e)}", "red"))
