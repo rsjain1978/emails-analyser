@@ -3,7 +3,7 @@ import os
 import json
 from typing import List, Dict
 from termcolor import colored
-from prompts import EMAIL_ANALYSIS_SYSTEM_PROMPT, EMAIL_SUMMARY_SYSTEM_PROMPT
+from prompts import EMAIL_ANALYSIS_SYSTEM_PROMPT, EMAIL_SUMMARY_SYSTEM_PROMPT, EMAIL_ANALYSIS_USER_PROMPT_TEMPLATE
 
 from dotenv import load_dotenv  
 load_dotenv()
@@ -42,61 +42,17 @@ class LLMService:
     async def analyze_email_content(self, email_content: str, search_terms: List[str]) -> dict:
         """Analyze email content for semantic matches with search terms"""
         try:
-            system_prompt = """You are an expert email analyzer with deep understanding of business context and semantic meaning.
-Your task is to analyze emails and find relevant content based on search terms, considering:
-
-1. Semantic Relevance: Look for content that matches the meaning and intent of search terms, not just exact matches
-2. Context Understanding: Consider the broader context of discussions and implied meanings
-3. Business Intelligence: Identify business-relevant information related to the search terms
-4. Key Information: Extract important details even if they use different wording than the search terms
-5. Related Concepts: Include relevant content that uses synonyms or related business concepts
-6. Indirect References: Capture indirect mentions and implied connections to the search terms
-
-For each search term:
-- Find ALL relevant content, including semantic matches and contextually related information
-- Include surrounding context to ensure the meaning is clear
-- Consider business implications and relationships
-- Look for both explicit and implicit references
-- Consider industry-specific terminology and jargon
-
-Return a structured analysis with:
-1. Semantic matches for each term (with context)
-2. Overall relevance score (0-100)
-3. Key insights found
-4. Important context that might not directly match but is relevant"""
-
-            prompt = f"""Analyze this email content for the following search terms: {', '.join(search_terms)}
-
-Email Content:
-{email_content}
-
-Provide a detailed analysis in JSON format with the following structure:
-{{
-    "semantic_matches": {{
-        "term": [
-            {{
-                "text": "relevant text snippet",
-                "context": "surrounding context",
-                "relevance": "explanation of relevance"
-            }}
-        ]
-    }},
-    "overall_relevance_score": number,
-    "key_insights": [
-        "insight 1",
-        "insight 2"
-    ],
-    "important_context": [
-        "context 1",
-        "context 2"
-    ]
-}}"""
+            # Format the user prompt with the search terms and email content
+            user_prompt = EMAIL_ANALYSIS_USER_PROMPT_TEMPLATE.format(
+                search_terms=', '.join(search_terms),
+                email_content=email_content
+            )
 
             completion = await self.client.chat.completions.create(
                 model=self.MODEL,
                 messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}
+                    {"role": "system", "content": EMAIL_ANALYSIS_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt}
                 ],
                 response_format={"type": "json_object"}
             )
