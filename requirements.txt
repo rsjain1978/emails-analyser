@@ -6,4 +6,8 @@ termcolor
 aiofiles
 python-multipart
 fpdf
-extract-msg 
+extract-msg
+jinja2
+reportlab
+beautifulsoup4
+html2text

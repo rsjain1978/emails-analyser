@@ -16,3 +16,7 @@ node_modules/
 # Ignore other unwanted files
 .DS_Store
 
+venv/
+emailanalyser/
+emails/
+uploaded_emails/

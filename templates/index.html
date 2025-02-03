@@ -304,9 +304,9 @@
                         </button>
                     </div>
                     <div class="upload-area" id="dropZone">
-                        <input type="file" id="fileInput" multiple accept=".msg" class="hidden">
+                        <input type="file" id="fileInput" multiple accept=".msg,.eml" class="hidden">
                         <div class="text-lg mb-2">Drag and drop email files here</div>
-                        <div class="text-sm text-gray-500 mb-2">Supported format: .msg (Outlook Message)</div>
+                        <div class="text-sm text-gray-500 mb-2">Supported formats: .msg (Outlook Message), .eml (Email Message)</div>
                         <div class="text-sm text-gray-500">or</div>
                         <button class="btn btn-blue mt-2" onclick="document.getElementById('fileInput').click()">
                             Select Files
@@ -429,7 +429,7 @@
             
             for (const file of files) {
                 const ext = file.name.toLowerCase().split('.').pop();
-                if (ext === 'msg') {
+                if (ext === 'msg' || ext === 'eml') {
                     formData.append('files', file);
                     validFiles++;
                 } else {
@@ -438,7 +438,7 @@
             }
 
             if (validFiles === 0) {
-                showStatus('No valid email files selected. Please upload .msg files only.', 'warning');
+                showStatus('No valid email files selected. Please upload .msg or .eml files only.', 'warning');
                 return;
             }
 

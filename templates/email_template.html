@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Email Content</title>
+    {{ styles | safe }}
+</head>
+<body>
+    <div class="document">
+        <h1>Email Details</h1>
+        
+        <div class="header">
+            <p><span class="label">From:</span> {{ from_addr }}</p>
+            <p><span class="label">To:</span> {{ to_addr }}</p>
+            <p><span class="label">Subject:</span> {{ subject }}</p>
+            <p><span class="label">Date:</span> {{ date }}</p>
+        </div>
+        
+        <div class="content">
+            {% if body %}
+                {% if '\n' in body %}
+                    <pre class="email-body">{{ body }}</pre>
+                {% else %}
+                    <div class="email-body">{{ body | safe }}</div>
+                {% endif %}
+            {% else %}
+                <p><em>No content available</em></p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html> 
